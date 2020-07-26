@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,7 +10,13 @@ namespace GorillazVintage
 {
     public partial class MainWindow : Window
     {
-        private const double EXPLOSION_RANGE = 10;
+        private const int WINDOW_ZINDEX = 2;
+        private const int EXPLOSION_ZINDEX = 3;
+        private const int BANANA_ZINDEX = 4;
+        private const int MONKEY_ZINDEX = 1;
+        private const int BUILDING_ZINDEX = 1;
+
+        private const double EXPLOSION_RANGE = 20;
         private const double MAX_SPEED = 30;
         private const double METER_TO_PIXEL_RATE = 12;
         private const double FPS = 60;
@@ -54,12 +59,7 @@ namespace GorillazVintage
             CvsMain.Width = WIDTH;
             CvsMain.Height = HEIGHT;
 
-            SetBuildings();
-
-            DrawMainCanvasBuildings();
-
-            CvsMain.Children.Add(DrawMonkeySprite(1));
-            CvsMain.Children.Add(DrawMonkeySprite(8));
+            NewGame();
 
             _timer = new NoLockTimer(ELAPSE, TimerAction);
         }
@@ -73,7 +73,7 @@ namespace GorillazVintage
                 Height = MONKEY_SIZE
             };
 
-            img.SetValue(Panel.ZIndexProperty, 1);
+            img.SetValue(Panel.ZIndexProperty, MONKEY_ZINDEX);
             img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsInfo[buildingIndex].Height - MONKEY_SIZE);
             img.SetValue(Canvas.LeftProperty, (buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2));
             return img;
@@ -81,9 +81,6 @@ namespace GorillazVintage
 
         private void SetBuildings()
         {
-            _buildingsInfo.Clear();
-            _explosions.Clear();
-
             var formerBuildingRate = Double.NaN;
             for (int i = 0; i < BUILDING_COUNT; i++)
             {
@@ -107,21 +104,6 @@ namespace GorillazVintage
                 );
         }
 
-        private void DrawMainCanvasBuildings()
-        {
-            var formerBuldings = GetChildrenByTypeAndTag<Canvas>(CvsMain, BUILDING_TAG);
-
-            foreach (var formerBulding in formerBuldings)
-            {
-                CvsMain.Children.Remove(formerBulding);
-            }
-
-            foreach (var building in CreateBuildings(_buildingsInfo))
-            {
-                CvsMain.Children.Add(building);
-            }
-        }
-
         private static IEnumerable<Canvas> CreateBuildings(List<Rect> buildingsHeightInfo)
         {
             foreach (var buildind in buildingsHeightInfo)
@@ -140,7 +122,7 @@ namespace GorillazVintage
                 Tag = BUILDING_TAG
             };
 
-            buildingCanvas.SetValue(Panel.ZIndexProperty, 1);
+            buildingCanvas.SetValue(Panel.ZIndexProperty, BUILDING_ZINDEX);
             buildingCanvas.SetValue(Canvas.TopProperty, building.Top);
             buildingCanvas.SetValue(Canvas.LeftProperty, building.Left);
 
@@ -182,7 +164,7 @@ namespace GorillazVintage
                 Fill = _rdm.Next(1, 3) == 1 ? Brushes.Yellow : Brushes.Black
             };
 
-            window.SetValue(Panel.ZIndexProperty, 2);
+            window.SetValue(Panel.ZIndexProperty, WINDOW_ZINDEX);
             window.SetValue(Canvas.TopProperty, buildingHeight - heightWhereToDraw);
             window.SetValue(Canvas.LeftProperty, concretePadLeft + (currentColumnIndex * BUILDING_WINDOW_SIZE));
 
@@ -244,7 +226,7 @@ namespace GorillazVintage
                     Height = BANANA_SIZE,
                     Fill = Brushes.Yellow
                 };
-                _bananaControl.SetValue(Panel.ZIndexProperty, 2);
+                _bananaControl.SetValue(Panel.ZIndexProperty, BANANA_ZINDEX);
             }
             _bananaControl.SetValue(Canvas.TopProperty, _bananaCurrentPosition.X);
             _bananaControl.SetValue(Canvas.LeftProperty, _bananaCurrentPosition.Y);
@@ -280,7 +262,7 @@ namespace GorillazVintage
                             Height = explosion.Height
                         };
 
-                        exEll.SetValue(Panel.ZIndexProperty, 2);
+                        exEll.SetValue(Panel.ZIndexProperty, EXPLOSION_ZINDEX);
                         exEll.SetValue(Canvas.TopProperty, explosion.Top);
                         exEll.SetValue(Canvas.LeftProperty, explosion.Left);
 
@@ -316,14 +298,14 @@ namespace GorillazVintage
                 building.Intersect(bananaRect);
                 if (building != Rect.Empty)
                 {
-                    /*foreach (var explosion in _explosions)
+                    foreach (var explosion in _explosions)
                     {
                         explosion.Intersect(bananaRect);
                         if (bananaRect == explosion)
                         {
                             return false;
                         }
-                    }*/
+                    }
 
                     _explosions.Add(new Rect(
                         building.Left - EXPLOSION_RANGE,
@@ -337,6 +319,31 @@ namespace GorillazVintage
             }
 
             return false;
+        }
+
+        private void BtnNew_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_throwInProgress)
+            {
+                NewGame();
+            }
+        }
+
+        private void NewGame()
+        {
+            _buildingsInfo.Clear();
+            _explosions.Clear();
+            CvsMain.Children.Clear();
+
+            SetBuildings();
+
+            foreach (var building in CreateBuildings(_buildingsInfo))
+            {
+                CvsMain.Children.Add(building);
+            }
+
+            CvsMain.Children.Add(DrawMonkeySprite(1));
+            CvsMain.Children.Add(DrawMonkeySprite(8));
         }
     }
 }
