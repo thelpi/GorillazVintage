@@ -31,8 +31,8 @@ namespace GorillazVintage
         {
             InitializeComponent();
 
-            Width = WIDTH;
-            Height = HEIGHT;
+            CvsMain.Width = WIDTH;
+            CvsMain.Height = HEIGHT;
 
             SetBuildings();
 
@@ -86,32 +86,35 @@ namespace GorillazVintage
             var currentBuildingIndex = 0;
             foreach (var buildingHeight in buildingsHeightInfo)
             {
-                var buildingWidth = BUILDING_WIDTH;
-
-                var buildingCanvas = new Canvas
-                {
-                    Width = buildingWidth,
-                    Height = buildingHeight,
-                    Background = Brushes.Gray,
-                    Tag = BUILDING_TAG
-                };
-
-                buildingCanvas.SetValue(Panel.ZIndexProperty, 1);
-                buildingCanvas.SetValue(Canvas.TopProperty, HEIGHT - buildingHeight);
-                buildingCanvas.SetValue(Canvas.LeftProperty, currentBuildingIndex * buildingWidth);
-
-                foreach (var window in CreateBuildingWindows(buildingHeight, buildingWidth))
-                {
-                    buildingCanvas.Children.Add(window);
-                }
-
-                yield return buildingCanvas;
+                yield return DrawBuilding(currentBuildingIndex, buildingHeight);
 
                 currentBuildingIndex++;
             }
         }
 
-        private static IEnumerable<Rectangle> CreateBuildingWindows(double buildingHeight, double buildingWidth)
+        private static Canvas DrawBuilding(int currentBuildingIndex, double buildingHeight)
+        {
+            var buildingCanvas = new Canvas
+            {
+                Width = BUILDING_WIDTH,
+                Height = buildingHeight,
+                Background = Brushes.Gray,
+                Tag = BUILDING_TAG
+            };
+
+            buildingCanvas.SetValue(Panel.ZIndexProperty, 1);
+            buildingCanvas.SetValue(Canvas.TopProperty, HEIGHT - buildingHeight);
+            buildingCanvas.SetValue(Canvas.LeftProperty, currentBuildingIndex * BUILDING_WIDTH);
+
+            foreach (var window in CreateBuildingWindows(buildingHeight))
+            {
+                buildingCanvas.Children.Add(window);
+            }
+
+            return buildingCanvas;
+        }
+
+        private static IEnumerable<Rectangle> CreateBuildingWindows(double buildingHeight)
         {
             var heightToDraw = buildingHeight;
             var switcher = 0;
@@ -119,7 +122,7 @@ namespace GorillazVintage
             {
                 if (switcher % 2 == 1)
                 {
-                    var pad = (buildingWidth - WINDOW_WIDTH_FIRST_TO_LAST) * 0.5;
+                    var pad = (BUILDING_WIDTH - WINDOW_WIDTH_FIRST_TO_LAST) * 0.5;
                     for (var i = 0; i < BUILDING_WINDOW_LINE_COUNT; i++)
                     {
                         yield return DrawWindow(buildingHeight, heightToDraw, pad, i);
