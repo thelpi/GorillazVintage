@@ -11,6 +11,8 @@ namespace GorillazVintage
 {
     public partial class MainWindow : Window
     {
+        private const double MAX_SPEED = 30;
+        private const double METER_TO_PIXEL_RATE = 12;
         private const double FPS = 60;
         private const double MONKEY_SIZE = 40;
         private const double BANANA_SIZE = 10;
@@ -198,20 +200,9 @@ namespace GorillazVintage
                 return;
             }
 
-            _bananaInitialPosition = new Point(
-                (HEIGHT - _buildingsHeightInfo[8] - MONKEY_SIZE) - BANANA_SIZE,
-                ((8 * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2)) - BANANA_SIZE
-            );
-            _bananaCurrentPosition = new Point(
-                _bananaInitialPosition.X,
-                _bananaInitialPosition.Y
-            );
+            SetBananaInitialValues(false);
 
-            _flightTime = 0;
-            _initialSpeed = SldSpeed.Value / 10;
-            _initialAngle = (Math.PI / 180) * SldAngle.Value;
-
-            SetBanana(true);
+            DrawBanana(true);
 
             CvsMain.Children.Add(_bananaControl);
 
@@ -220,7 +211,26 @@ namespace GorillazVintage
             _timer.Start();
         }
 
-        private void SetBanana(bool start)
+        private void SetBananaInitialValues(bool firstPlayer)
+        {
+            var buildingIndex = firstPlayer ? 1 : 8;
+
+            _bananaInitialPosition = new Point(
+                (HEIGHT - _buildingsHeightInfo[buildingIndex] - MONKEY_SIZE) - BANANA_SIZE,
+                ((buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2)) - BANANA_SIZE
+            );
+
+            _bananaCurrentPosition = new Point(
+                _bananaInitialPosition.X,
+                _bananaInitialPosition.Y
+            );
+
+            _flightTime = 0;
+            _initialSpeed = MAX_SPEED * (SldSpeed.Value / 100);
+            _initialAngle = (Math.PI / 180) * SldAngle.Value;
+        }
+
+        private void DrawBanana(bool start)
         {
             if (start)
             {
@@ -228,7 +238,7 @@ namespace GorillazVintage
                 {
                     Width = BANANA_SIZE,
                     Height = BANANA_SIZE,
-                    Fill = Brushes.Purple
+                    Fill = Brushes.Yellow
                 };
                 _bananaControl.SetValue(Panel.ZIndexProperty, 2);
             }
@@ -246,11 +256,9 @@ namespace GorillazVintage
 
             _flightTime += 1 / FPS;
 
-            _bananaCurrentPosition = new Point(
-                _bananaInitialPosition.X + ((_flightTime * _initialSpeed * Math.Cos(_initialAngle)) * -1),
-                ((_flightTime * _initialSpeed * Math.Sin(_initialAngle)) - (0.5 * GRAVITY * _flightTime * _flightTime)) + _bananaInitialPosition.Y);
+            SetBananaNewPosition(true);
 
-            bool colision = false;
+            var colision = false;
 
             if (colision)
             {
@@ -259,10 +267,21 @@ namespace GorillazVintage
             }
             else
             {
-                Dispatcher.Invoke(() => SetBanana(false));
+                Dispatcher.Invoke(() => DrawBanana(false));
             }
 
             _timerIsCurrent = false;
+        }
+
+        private void SetBananaNewPosition(bool fromRight)
+        {
+            var yDelta = (_flightTime * _initialSpeed * Math.Cos(_initialAngle)) * (fromRight  ? - 1 : 1);
+            var xDelta = ((_flightTime * _initialSpeed * Math.Sin(_initialAngle)) - (0.5 * GRAVITY * _flightTime * _flightTime));
+
+            _bananaCurrentPosition = new Point(
+                _bananaInitialPosition.X - (METER_TO_PIXEL_RATE * xDelta),
+                _bananaInitialPosition.Y + (METER_TO_PIXEL_RATE * yDelta)
+            );
         }
     }
 }
