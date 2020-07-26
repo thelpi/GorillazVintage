@@ -10,6 +10,7 @@ namespace GorillazVintage
 {
     public partial class MainWindow : Window
     {
+        private const double SPRITE_SIZE = 40;
         private const double BUILDING_WINDOW_SIZE = 12;
         private const double BUILDING_WINDOW_LINE_COUNT = 4;
         private const double HEIGHT = 600;
@@ -37,6 +38,24 @@ namespace GorillazVintage
             SetBuildings();
 
             DrawMainCanvasBuildings();
+
+            CvsMain.Children.Add(DrawMonkeySprite(1));
+            CvsMain.Children.Add(DrawMonkeySprite(8));
+        }
+
+        private Image DrawMonkeySprite(int buildingIndex)
+        {
+            var img = new Image
+            {
+                Source = Properties.Resources.monkey_sprite.ToBitmapImage(),
+                Width = SPRITE_SIZE,
+                Height = SPRITE_SIZE
+            };
+
+            img.SetValue(Panel.ZIndexProperty, 1);
+            img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsHeightInfo[buildingIndex] - SPRITE_SIZE);
+            img.SetValue(Canvas.LeftProperty, (buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - SPRITE_SIZE) / 2));
+            return img;
         }
 
         private void SetBuildings()
