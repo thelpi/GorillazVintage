@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -10,7 +11,9 @@ namespace GorillazVintage
 {
     public partial class MainWindow : Window
     {
-        private const double SPRITE_SIZE = 40;
+        private const double FPS = 60;
+        private const double MONKEY_SIZE = 40;
+        private const double BANANA_SIZE = 10;
         private const double BUILDING_WINDOW_SIZE = 12;
         private const double BUILDING_WINDOW_LINE_COUNT = 4;
         private const double HEIGHT = 600;
@@ -20,13 +23,23 @@ namespace GorillazVintage
         private const double BUILDING_WIDTH_RATE = 0.1;
         private const double BUILDING_SPREAD_RATE = 0.1;
         private const string BUILDING_TAG = "BUILDING";
+        private const double GRAVITY = 9.80665;
 
         private static readonly double WINDOW_WIDTH_FIRST_TO_LAST = ((BUILDING_WINDOW_LINE_COUNT * BUILDING_WINDOW_SIZE) + ((BUILDING_WINDOW_LINE_COUNT - 1) * (BUILDING_WINDOW_SIZE * 0.5)));
         private static readonly double BUILDING_WIDTH = WIDTH * BUILDING_WIDTH_RATE;
         private static readonly int BUILDING_COUNT = (int)(1 / BUILDING_WIDTH_RATE);
+        private static readonly double ELAPSE = 1000 / FPS;
 
         private static readonly Random _rdm = new Random();
         private readonly List<double> _buildingsHeightInfo = new List<double>();
+        private readonly Timer _timer = new Timer(ELAPSE);
+        private Point _bananaCurrentPosition;
+        private Point _bananaInitialPosition;
+        private UIElement _bananaControl;
+        private bool _timerIsCurrent;
+        private double _initialSpeed;
+        private double _initialAngle;
+        private double _flightTime;
 
         public MainWindow()
         {
@@ -48,13 +61,13 @@ namespace GorillazVintage
             var img = new Image
             {
                 Source = Properties.Resources.monkey_sprite.ToBitmapImage(),
-                Width = SPRITE_SIZE,
-                Height = SPRITE_SIZE
+                Width = MONKEY_SIZE,
+                Height = MONKEY_SIZE
             };
 
             img.SetValue(Panel.ZIndexProperty, 1);
-            img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsHeightInfo[buildingIndex] - SPRITE_SIZE);
-            img.SetValue(Canvas.LeftProperty, (buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - SPRITE_SIZE) / 2));
+            img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsHeightInfo[buildingIndex] - MONKEY_SIZE);
+            img.SetValue(Canvas.LeftProperty, (buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2));
             return img;
         }
 
@@ -176,6 +189,80 @@ namespace GorillazVintage
                 .OfType<T>()
                 .Where(r => r.Tag != null && r.Tag.ToString() == tag)
                 .ToList();
+        }
+
+        private void BtnShoot_Click(object sender, RoutedEventArgs e)
+        {
+            if (_timer.Enabled)
+            {
+                return;
+            }
+
+            _bananaInitialPosition = new Point(
+                (HEIGHT - _buildingsHeightInfo[8] - MONKEY_SIZE) - BANANA_SIZE,
+                ((8 * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2)) - BANANA_SIZE
+            );
+            _bananaCurrentPosition = new Point(
+                _bananaInitialPosition.X,
+                _bananaInitialPosition.Y
+            );
+
+            _flightTime = 0;
+            _initialSpeed = SldSpeed.Value / 10;
+            _initialAngle = (Math.PI / 180) * SldAngle.Value;
+
+            SetBanana(true);
+
+            CvsMain.Children.Add(_bananaControl);
+
+            _timer.Elapsed += _timer_Elapsed;
+
+            _timer.Start();
+        }
+
+        private void SetBanana(bool start)
+        {
+            if (start)
+            {
+                _bananaControl = new Ellipse
+                {
+                    Width = BANANA_SIZE,
+                    Height = BANANA_SIZE,
+                    Fill = Brushes.Purple
+                };
+                _bananaControl.SetValue(Panel.ZIndexProperty, 2);
+            }
+            _bananaControl.SetValue(Canvas.TopProperty, _bananaCurrentPosition.X);
+            _bananaControl.SetValue(Canvas.LeftProperty, _bananaCurrentPosition.Y);
+        }
+
+        private void _timer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            if (_timerIsCurrent)
+            {
+                return;
+            }
+            _timerIsCurrent = true;
+
+            _flightTime += 1 / FPS;
+
+            _bananaCurrentPosition = new Point(
+                _bananaInitialPosition.X + ((_flightTime * _initialSpeed * Math.Cos(_initialAngle)) * -1),
+                ((_flightTime * _initialSpeed * Math.Sin(_initialAngle)) - (0.5 * GRAVITY * _flightTime * _flightTime)) + _bananaInitialPosition.Y);
+
+            bool colision = false;
+
+            if (colision)
+            {
+                Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
+                _timer.Stop();
+            }
+            else
+            {
+                Dispatcher.Invoke(() => SetBanana(false));
+            }
+
+            _timerIsCurrent = false;
         }
     }
 }

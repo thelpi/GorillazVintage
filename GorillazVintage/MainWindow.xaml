@@ -15,9 +15,9 @@
                 <RowDefinition Height="200" />
                 <RowDefinition Height="25" />
             </Grid.RowDefinitions>
-            <Slider Grid.Row="0" Grid.Column="0" Minimum="-90" Maximum="90" Value="45" Orientation="Vertical" />
-            <Slider Grid.Row="0" Grid.Column="1" Minimum="0" Maximum="100" Value="50" Orientation="Vertical" />
-            <Button Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Shoot" />
+            <Slider Grid.Row="0" Grid.Column="0" Name="SldAngle" Minimum="0" Maximum="90" Value="45" Orientation="Vertical" />
+            <Slider Grid.Row="0" Grid.Column="1" Name="SldSpeed" Minimum="0" Maximum="100" Value="50" Orientation="Vertical" />
+            <Button Name="BtnShoot" Click="BtnShoot_Click" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Shoot" />
         </Grid>
         <Canvas DockPanel.Dock="Left" Background="SkyBlue" Name="CvsMain" />
     </DockPanel>
