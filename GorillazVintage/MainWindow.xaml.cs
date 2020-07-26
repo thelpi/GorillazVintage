@@ -33,7 +33,8 @@ namespace GorillazVintage
         private static readonly double ELAPSE = 1000 / FPS;
 
         private static readonly Random _rdm = new Random();
-        private readonly List<double> _buildingsHeightInfo = new List<double>();
+        private readonly List<Rect> _buildingsInfo = new List<Rect>();
+        //private readonly List<Point> _explosions = new List<Point>();
         private readonly Timer _timer = new Timer(ELAPSE);
         private Point _bananaCurrentPosition;
         private Point _bananaInitialPosition;
@@ -68,15 +69,16 @@ namespace GorillazVintage
             };
 
             img.SetValue(Panel.ZIndexProperty, 1);
-            img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsHeightInfo[buildingIndex] - MONKEY_SIZE);
+            img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsInfo[buildingIndex].Height - MONKEY_SIZE);
             img.SetValue(Canvas.LeftProperty, (buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2));
             return img;
         }
 
         private void SetBuildings()
         {
-            _buildingsHeightInfo.Clear();
-            
+            _buildingsInfo.Clear();
+            //_explosions.Clear();
+
             var formerBuildingRate = Double.NaN;
             for (int i = 0; i < BUILDING_COUNT; i++)
             {
@@ -85,7 +87,7 @@ namespace GorillazVintage
                 {
                     buildingHeightRate = _rdm.NextDouble();
                 }
-                _buildingsHeightInfo.Add(buildingHeightRate * HEIGHT);
+                _buildingsInfo.Add(new Rect(i * BUILDING_WIDTH, HEIGHT - (buildingHeightRate * HEIGHT), BUILDING_WIDTH, buildingHeightRate * HEIGHT));
                 formerBuildingRate = buildingHeightRate;
             }
         }
@@ -109,38 +111,35 @@ namespace GorillazVintage
                 CvsMain.Children.Remove(formerBulding);
             }
 
-            foreach (var building in CreateBuildings(_buildingsHeightInfo))
+            foreach (var building in CreateBuildings(_buildingsInfo))
             {
                 CvsMain.Children.Add(building);
             }
         }
 
-        private static IEnumerable<Canvas> CreateBuildings(List<double> buildingsHeightInfo)
+        private static IEnumerable<Canvas> CreateBuildings(List<Rect> buildingsHeightInfo)
         {
-            var currentBuildingIndex = 0;
-            foreach (var buildingHeight in buildingsHeightInfo)
+            foreach (var buildind in buildingsHeightInfo)
             {
-                yield return DrawBuilding(currentBuildingIndex, buildingHeight);
-
-                currentBuildingIndex++;
+                yield return DrawBuilding(buildind);
             }
         }
 
-        private static Canvas DrawBuilding(int currentBuildingIndex, double buildingHeight)
+        private static Canvas DrawBuilding(Rect building)
         {
             var buildingCanvas = new Canvas
             {
                 Width = BUILDING_WIDTH,
-                Height = buildingHeight,
+                Height = building.Height,
                 Background = Brushes.Gray,
                 Tag = BUILDING_TAG
             };
 
             buildingCanvas.SetValue(Panel.ZIndexProperty, 1);
-            buildingCanvas.SetValue(Canvas.TopProperty, HEIGHT - buildingHeight);
-            buildingCanvas.SetValue(Canvas.LeftProperty, currentBuildingIndex * BUILDING_WIDTH);
+            buildingCanvas.SetValue(Canvas.TopProperty, building.Top);
+            buildingCanvas.SetValue(Canvas.LeftProperty, building.Left);
 
-            foreach (var window in CreateBuildingWindows(buildingHeight))
+            foreach (var window in CreateBuildingWindows(building))
             {
                 buildingCanvas.Children.Add(window);
             }
@@ -148,9 +147,9 @@ namespace GorillazVintage
             return buildingCanvas;
         }
 
-        private static IEnumerable<Rectangle> CreateBuildingWindows(double buildingHeight)
+        private static IEnumerable<Rectangle> CreateBuildingWindows(Rect building)
         {
-            var heightToDraw = buildingHeight;
+            var heightToDraw = building.Height;
             var switcher = 0;
             while (heightToDraw >= BUILDING_WINDOW_SIZE)
             {
@@ -159,7 +158,7 @@ namespace GorillazVintage
                     var pad = (BUILDING_WIDTH - WINDOW_WIDTH_FIRST_TO_LAST) * 0.5;
                     for (var i = 0; i < BUILDING_WINDOW_LINE_COUNT; i++)
                     {
-                        yield return DrawWindow(buildingHeight, heightToDraw, pad, i);
+                        yield return DrawWindow(building.Height, heightToDraw, pad, i);
 
                         pad += BUILDING_WINDOW_SIZE * 0.5;
                     }
@@ -216,7 +215,7 @@ namespace GorillazVintage
             var buildingIndex = firstPlayer ? 1 : 8;
 
             _bananaInitialPosition = new Point(
-                (HEIGHT - _buildingsHeightInfo[buildingIndex] - MONKEY_SIZE) - BANANA_SIZE,
+                (_buildingsInfo[buildingIndex].Top - MONKEY_SIZE) - BANANA_SIZE,
                 ((buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2)) - BANANA_SIZE
             );
 
@@ -291,15 +290,12 @@ namespace GorillazVintage
                 BANANA_SIZE);
 
             int i = 0;
-            foreach (var buildingHeight in _buildingsHeightInfo)
+            foreach (var building in _buildingsInfo)
             {
-                var buildingRect = new Rect(
-                    i * BUILDING_WIDTH,
-                    HEIGHT - buildingHeight,
-                    BUILDING_WIDTH,
-                    buildingHeight);
-                if (buildingRect.IntersectsWith(bananaRect))
+                building.Intersect(bananaRect);
+                if (building != Rect.Empty)
                 {
+                    //_explosions.Add();
                     return true;
                 }
                 i++;
