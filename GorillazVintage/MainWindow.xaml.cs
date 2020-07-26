@@ -258,16 +258,14 @@ namespace GorillazVintage
 
             SetBananaNewPosition(true);
 
-            var colision = false;
+            var colision = ColideWithBuilding();
+
+            Dispatcher.Invoke(() => DrawBanana(false));
 
             if (colision)
             {
                 Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
                 _timer.Stop();
-            }
-            else
-            {
-                Dispatcher.Invoke(() => DrawBanana(false));
             }
 
             _timerIsCurrent = false;
@@ -282,6 +280,32 @@ namespace GorillazVintage
                 _bananaInitialPosition.X - (METER_TO_PIXEL_RATE * xDelta),
                 _bananaInitialPosition.Y + (METER_TO_PIXEL_RATE * yDelta)
             );
+        }
+
+        private bool ColideWithBuilding()
+        {
+            var bananaRect = new Rect(
+                _bananaCurrentPosition.Y,
+                _bananaCurrentPosition.X,
+                BANANA_SIZE,
+                BANANA_SIZE);
+
+            int i = 0;
+            foreach (var buildingHeight in _buildingsHeightInfo)
+            {
+                var buildingRect = new Rect(
+                    i * BUILDING_WIDTH,
+                    HEIGHT - buildingHeight,
+                    BUILDING_WIDTH,
+                    buildingHeight);
+                if (buildingRect.IntersectsWith(bananaRect))
+                {
+                    return true;
+                }
+                i++;
+            }
+
+            return false;
         }
     }
 }
