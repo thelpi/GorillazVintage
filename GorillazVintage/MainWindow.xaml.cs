@@ -11,6 +11,7 @@ namespace GorillazVintage
 {
     public partial class MainWindow : Window
     {
+        private const double EXPLOSION_RANGE = 10;
         private const double MAX_SPEED = 30;
         private const double METER_TO_PIXEL_RATE = 12;
         private const double FPS = 60;
@@ -34,15 +35,17 @@ namespace GorillazVintage
 
         private static readonly Random _rdm = new Random();
         private readonly List<Rect> _buildingsInfo = new List<Rect>();
-        //private readonly List<Point> _explosions = new List<Point>();
-        private readonly Timer _timer = new Timer(ELAPSE);
+        private readonly List<Rect> _explosions = new List<Rect>();
+        private readonly NoLockTimer _timer;
         private Point _bananaCurrentPosition;
         private Point _bananaInitialPosition;
         private UIElement _bananaControl;
-        private bool _timerIsCurrent;
         private double _initialSpeed;
         private double _initialAngle;
         private double _flightTime;
+        private DateTime _lastCheckDate;
+        private bool _throwInProgress = false;
+        private object _locker = new object();
 
         public MainWindow()
         {
@@ -57,6 +60,8 @@ namespace GorillazVintage
 
             CvsMain.Children.Add(DrawMonkeySprite(1));
             CvsMain.Children.Add(DrawMonkeySprite(8));
+
+            _timer = new NoLockTimer(ELAPSE, TimerAction);
         }
 
         private Image DrawMonkeySprite(int buildingIndex)
@@ -77,7 +82,7 @@ namespace GorillazVintage
         private void SetBuildings()
         {
             _buildingsInfo.Clear();
-            //_explosions.Clear();
+            _explosions.Clear();
 
             var formerBuildingRate = Double.NaN;
             for (int i = 0; i < BUILDING_COUNT; i++)
@@ -194,7 +199,7 @@ namespace GorillazVintage
 
         private void BtnShoot_Click(object sender, RoutedEventArgs e)
         {
-            if (_timer.Enabled)
+            if (_throwInProgress)
             {
                 return;
             }
@@ -204,8 +209,6 @@ namespace GorillazVintage
             DrawBanana(true);
 
             CvsMain.Children.Add(_bananaControl);
-
-            _timer.Elapsed += _timer_Elapsed;
 
             _timer.Start();
         }
@@ -227,6 +230,8 @@ namespace GorillazVintage
             _flightTime = 0;
             _initialSpeed = MAX_SPEED * (SldSpeed.Value / 100);
             _initialAngle = (Math.PI / 180) * SldAngle.Value;
+            _lastCheckDate = DateTime.Now;
+            _throwInProgress = true;
         }
 
         private void DrawBanana(bool start)
@@ -245,29 +250,46 @@ namespace GorillazVintage
             _bananaControl.SetValue(Canvas.LeftProperty, _bananaCurrentPosition.Y);
         }
 
-        private void _timer_Elapsed(object sender, ElapsedEventArgs e)
+        private bool TimerAction()
         {
-            if (_timerIsCurrent)
+            if (_throwInProgress)
             {
-                return;
+                _flightTime += (DateTime.Now - _lastCheckDate).TotalSeconds;
+                _lastCheckDate = DateTime.Now;
+
+                SetBananaNewPosition(true);
+
+                var colision = ColideWithBuilding();
+
+                Dispatcher.Invoke(() => DrawBanana(false));
+
+                if (colision)
+                {
+                    Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
+                    _throwInProgress = false;
+                }
+
+                foreach (var explosion in _explosions)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        Ellipse exEll = new Ellipse
+                        {
+                            Fill = CvsMain.Background,
+                            Width = explosion.Width,
+                            Height = explosion.Height
+                        };
+
+                        exEll.SetValue(Panel.ZIndexProperty, 2);
+                        exEll.SetValue(Canvas.TopProperty, explosion.Top);
+                        exEll.SetValue(Canvas.LeftProperty, explosion.Left);
+
+                        CvsMain.Children.Add(exEll);
+                    });
+                }
             }
-            _timerIsCurrent = true;
 
-            _flightTime += 1 / FPS;
-
-            SetBananaNewPosition(true);
-
-            var colision = ColideWithBuilding();
-
-            Dispatcher.Invoke(() => DrawBanana(false));
-
-            if (colision)
-            {
-                Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
-                _timer.Stop();
-            }
-
-            _timerIsCurrent = false;
+            return _throwInProgress;
         }
 
         private void SetBananaNewPosition(bool fromRight)
@@ -288,14 +310,27 @@ namespace GorillazVintage
                 _bananaCurrentPosition.X,
                 BANANA_SIZE,
                 BANANA_SIZE);
-
             int i = 0;
             foreach (var building in _buildingsInfo)
             {
                 building.Intersect(bananaRect);
                 if (building != Rect.Empty)
                 {
-                    //_explosions.Add();
+                    /*foreach (var explosion in _explosions)
+                    {
+                        explosion.Intersect(bananaRect);
+                        if (bananaRect == explosion)
+                        {
+                            return false;
+                        }
+                    }*/
+
+                    _explosions.Add(new Rect(
+                        building.Left - EXPLOSION_RANGE,
+                        building.Top - EXPLOSION_RANGE,
+                        2 * EXPLOSION_RANGE,
+                        2 * EXPLOSION_RANGE));
+                    //System.Diagnostics.Debug.WriteLine("Add to _explosions");
                     return true;
                 }
                 i++;
