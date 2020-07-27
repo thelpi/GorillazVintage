@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -30,13 +29,14 @@ namespace GorillazVintage
         private const double MIN_BUILDING_HEIGHT_RATE = 0.2;
         private const double BUILDING_WIDTH_RATE = 0.1;
         private const double BUILDING_SPREAD_RATE = 0.1;
-        private const string BUILDING_TAG = "BUILDING";
         private const double GRAVITY = 9.80665;
 
         private static readonly double WINDOW_WIDTH_FIRST_TO_LAST = ((BUILDING_WINDOW_LINE_COUNT * BUILDING_WINDOW_SIZE) + ((BUILDING_WINDOW_LINE_COUNT - 1) * (BUILDING_WINDOW_SIZE * 0.5)));
         private static readonly double BUILDING_WIDTH = WIDTH * BUILDING_WIDTH_RATE;
         private static readonly int BUILDING_COUNT = (int)(1 / BUILDING_WIDTH_RATE);
         private static readonly double ELAPSE = 1000 / FPS;
+        private static readonly int MONKEY_0_BUILDING = 1;
+        private static readonly int MONKEY_1_BUILDING = BUILDING_COUNT - 2;
 
         private static readonly Random _rdm = new Random();
         private readonly List<Rect> _buildingsInfo = new List<Rect>();
@@ -45,6 +45,7 @@ namespace GorillazVintage
         private Rect _bananaRect;
         private Point _bananaInitialPosition;
         private UIElement _bananaControl;
+        private UIElement[] _monkeyControl = new UIElement[2];
         private double _initialSpeed;
         private double _initialAngle;
         private double _flightTime;
@@ -95,8 +96,7 @@ namespace GorillazVintage
             {
                 Width = BUILDING_WIDTH,
                 Height = building.Height,
-                Background = Brushes.Gray,
-                Tag = BUILDING_TAG
+                Background = Brushes.Gray
             };
 
             buildingCanvas.SetValue(Panel.ZIndexProperty, BUILDING_ZINDEX);
@@ -191,7 +191,7 @@ namespace GorillazVintage
 
         private void SetBananaInitialValues(bool firstPlayer)
         {
-            var buildingIndex = firstPlayer ? 1 : 8;
+            var buildingIndex = firstPlayer ? MONKEY_0_BUILDING : MONKEY_1_BUILDING;
 
             _bananaInitialPosition = new Point(
                 (_buildingsInfo[buildingIndex].Top - MONKEY_SIZE) - BANANA_SIZE,
@@ -237,7 +237,15 @@ namespace GorillazVintage
 
                 SetBananaNewPosition(true);
 
-                ColideWithMonkey();
+                int monkeyIndex = ColideWithMonkey();
+
+                if (monkeyIndex >= 0)
+                {
+                    Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
+                    Dispatcher.Invoke(() => CvsMain.Children.Remove(_monkeyControl[monkeyIndex]));
+                    Dispatcher.Invoke(() => MessageBox.Show("End of the game !"));
+                    _throwInProgress = false;
+                }
 
                 var buildingColision = ColideWithBuilding();
 
@@ -246,6 +254,10 @@ namespace GorillazVintage
                 if (buildingColision)
                 {
                     Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
+                    _throwInProgress = false;
+                }
+                else if (IsOutOfBounds())
+                {
                     _throwInProgress = false;
                 }
 
@@ -276,9 +288,25 @@ namespace GorillazVintage
             return _throwInProgress;
         }
 
-        private void ColideWithMonkey()
+        private bool IsOutOfBounds()
         {
+            // lazy: to avoid the fact there's no height limit, we just use a big value
+            return !new Rect(0, -(HEIGHT * 100), WIDTH, HEIGHT * 101).IntersectsWith(_bananaRect);
+        }
 
+        private int ColideWithMonkey()
+        {
+            if (_bananaRect.IntersectsWith(_monkey1))
+            {
+                return 0;
+            }
+
+            if (_bananaRect.IntersectsWith(_monkey2))
+            {
+                return 1;
+            }
+
+            return -1;
         }
 
         private void SetBananaNewPosition(bool fromRight)
@@ -343,20 +371,23 @@ namespace GorillazVintage
             }
 
             _monkey1 = new Rect(
-                (BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2),
-                HEIGHT - _buildingsInfo[1].Height - MONKEY_SIZE,
+                (MONKEY_0_BUILDING * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2),
+                HEIGHT - _buildingsInfo[MONKEY_0_BUILDING].Height - MONKEY_SIZE,
                 MONKEY_SIZE,
                 MONKEY_SIZE
             );
             _monkey2 = new Rect(
-                (8 * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2),
-                HEIGHT - _buildingsInfo[8].Height - MONKEY_SIZE,
+                (MONKEY_1_BUILDING * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2),
+                HEIGHT - _buildingsInfo[MONKEY_1_BUILDING].Height - MONKEY_SIZE,
                 MONKEY_SIZE,
                 MONKEY_SIZE
             );
 
-            CvsMain.Children.Add(DrawMonkeySprite(_monkey1));
-            CvsMain.Children.Add(DrawMonkeySprite(_monkey2));
+            _monkeyControl[0] = DrawMonkeySprite(_monkey1);
+            _monkeyControl[1] = DrawMonkeySprite(_monkey2);
+
+            CvsMain.Children.Add(_monkeyControl[0]);
+            CvsMain.Children.Add(_monkeyControl[1]);
         }
     }
 }
