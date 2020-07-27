@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -40,7 +41,7 @@ namespace GorillazVintage
 
         private static readonly Random _rdm = new Random();
         private readonly List<Rect> _buildingsInfo = new List<Rect>();
-        private readonly List<Rect> _explosions = new List<Rect>();
+        private readonly Dictionary<Rect, bool> _explosions = new Dictionary<Rect, bool>();
         private readonly NoLockTimer _timer;
         private Point _bananaCurrentPosition;
         private Point _bananaInitialPosition;
@@ -251,23 +252,27 @@ namespace GorillazVintage
                     _throwInProgress = false;
                 }
 
-                foreach (var explosion in _explosions)
+                foreach (var explosion in _explosions.Keys)
                 {
-                    Dispatcher.Invoke(() =>
+                    if (!_explosions[explosion])
                     {
-                        Ellipse exEll = new Ellipse
+                        Dispatcher.Invoke(() =>
                         {
-                            Fill = CvsMain.Background,
-                            Width = explosion.Width,
-                            Height = explosion.Height
-                        };
+                            Ellipse exEll = new Ellipse
+                            {
+                                Fill = CvsMain.Background,
+                                Width = explosion.Width,
+                                Height = explosion.Height
+                            };
 
-                        exEll.SetValue(Panel.ZIndexProperty, EXPLOSION_ZINDEX);
-                        exEll.SetValue(Canvas.TopProperty, explosion.Top);
-                        exEll.SetValue(Canvas.LeftProperty, explosion.Left);
+                            exEll.SetValue(Panel.ZIndexProperty, EXPLOSION_ZINDEX);
+                            exEll.SetValue(Canvas.TopProperty, explosion.Top);
+                            exEll.SetValue(Canvas.LeftProperty, explosion.Left);
 
-                        CvsMain.Children.Add(exEll);
-                    });
+                            CvsMain.Children.Add(exEll);
+                        });
+                        _explosions[explosion] = true;
+                    }
                 }
             }
 
@@ -298,7 +303,7 @@ namespace GorillazVintage
                 building.Intersect(bananaRect);
                 if (building != Rect.Empty)
                 {
-                    foreach (var explosion in _explosions)
+                    foreach (var explosion in _explosions.Keys)
                     {
                         explosion.Intersect(bananaRect);
                         if (bananaRect == explosion)
@@ -311,8 +316,8 @@ namespace GorillazVintage
                         building.Left - EXPLOSION_RANGE,
                         building.Top - EXPLOSION_RANGE,
                         2 * EXPLOSION_RANGE,
-                        2 * EXPLOSION_RANGE));
-                    //System.Diagnostics.Debug.WriteLine("Add to _explosions");
+                        2 * EXPLOSION_RANGE), false);
+                    
                     return true;
                 }
                 i++;
