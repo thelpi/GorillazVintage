@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -43,7 +42,7 @@ namespace GorillazVintage
         private readonly List<Rect> _buildingsInfo = new List<Rect>();
         private readonly Dictionary<Rect, bool> _explosions = new Dictionary<Rect, bool>();
         private readonly NoLockTimer _timer;
-        private Point _bananaCurrentPosition;
+        private Rect _bananaRect;
         private Point _bananaInitialPosition;
         private UIElement _bananaControl;
         private double _initialSpeed;
@@ -52,6 +51,8 @@ namespace GorillazVintage
         private DateTime _lastCheckDate;
         private bool _throwInProgress = false;
         private object _locker = new object();
+        private Rect _monkey1;
+        private Rect _monkey2;
 
         public MainWindow()
         {
@@ -65,44 +66,19 @@ namespace GorillazVintage
             _timer = new NoLockTimer(ELAPSE, TimerAction);
         }
 
-        private Image DrawMonkeySprite(int buildingIndex)
+        private static Image DrawMonkeySprite(Rect monkeyRect)
         {
             var img = new Image
             {
                 Source = Properties.Resources.monkey_sprite.ToBitmapImage(),
-                Width = MONKEY_SIZE,
-                Height = MONKEY_SIZE
+                Width = monkeyRect.Width,
+                Height = monkeyRect.Height
             };
 
             img.SetValue(Panel.ZIndexProperty, MONKEY_ZINDEX);
-            img.SetValue(Canvas.TopProperty, HEIGHT - _buildingsInfo[buildingIndex].Height - MONKEY_SIZE);
-            img.SetValue(Canvas.LeftProperty, (buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2));
+            img.SetValue(Canvas.TopProperty, monkeyRect.Top);
+            img.SetValue(Canvas.LeftProperty, monkeyRect.Left);
             return img;
-        }
-
-        private void SetBuildings()
-        {
-            var formerBuildingRate = Double.NaN;
-            for (int i = 0; i < BUILDING_COUNT; i++)
-            {
-                var buildingHeightRate = _rdm.NextDouble();
-                while (!IsInBuildingHeightRange(formerBuildingRate, buildingHeightRate))
-                {
-                    buildingHeightRate = _rdm.NextDouble();
-                }
-                _buildingsInfo.Add(new Rect(i * BUILDING_WIDTH, HEIGHT - (buildingHeightRate * HEIGHT), BUILDING_WIDTH, buildingHeightRate * HEIGHT));
-                formerBuildingRate = buildingHeightRate;
-            }
-        }
-
-        private static bool IsInBuildingHeightRange(double formerBuildingRate, double buildingHeightRate)
-        {
-            return buildingHeightRate > MIN_BUILDING_HEIGHT_RATE
-                && buildingHeightRate < MAX_BUILDING_HEIGHT_RATE
-                && (
-                    Double.IsNaN(formerBuildingRate)
-                    || Math.Abs(formerBuildingRate - buildingHeightRate) > BUILDING_SPREAD_RATE
-                );
         }
 
         private static IEnumerable<Canvas> CreateBuildings(List<Rect> buildingsHeightInfo)
@@ -172,14 +148,31 @@ namespace GorillazVintage
             return window;
         }
 
-        private static List<T> GetChildrenByTypeAndTag<T>(Panel panel, string tag) where T : FrameworkElement
+        private void SetBuildings()
         {
-            return panel.Children
-                .OfType<T>()
-                .Where(r => r.Tag != null && r.Tag.ToString() == tag)
-                .ToList();
+            var formerBuildingRate = Double.NaN;
+            for (int i = 0; i < BUILDING_COUNT; i++)
+            {
+                var buildingHeightRate = _rdm.NextDouble();
+                while (!IsInBuildingHeightRange(formerBuildingRate, buildingHeightRate))
+                {
+                    buildingHeightRate = _rdm.NextDouble();
+                }
+                _buildingsInfo.Add(new Rect(i * BUILDING_WIDTH, HEIGHT - (buildingHeightRate * HEIGHT), BUILDING_WIDTH, buildingHeightRate * HEIGHT));
+                formerBuildingRate = buildingHeightRate;
+            }
         }
 
+        private static bool IsInBuildingHeightRange(double formerBuildingRate, double buildingHeightRate)
+        {
+            return buildingHeightRate > MIN_BUILDING_HEIGHT_RATE
+                && buildingHeightRate < MAX_BUILDING_HEIGHT_RATE
+                && (
+                    Double.IsNaN(formerBuildingRate)
+                    || Math.Abs(formerBuildingRate - buildingHeightRate) > BUILDING_SPREAD_RATE
+                );
+        }
+        
         private void BtnShoot_Click(object sender, RoutedEventArgs e)
         {
             if (_throwInProgress)
@@ -205,9 +198,11 @@ namespace GorillazVintage
                 ((buildingIndex * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2)) - BANANA_SIZE
             );
 
-            _bananaCurrentPosition = new Point(
+            _bananaRect = new Rect(
+                _bananaInitialPosition.Y,
                 _bananaInitialPosition.X,
-                _bananaInitialPosition.Y
+                BANANA_SIZE,
+                BANANA_SIZE
             );
 
             _flightTime = 0;
@@ -229,8 +224,8 @@ namespace GorillazVintage
                 };
                 _bananaControl.SetValue(Panel.ZIndexProperty, BANANA_ZINDEX);
             }
-            _bananaControl.SetValue(Canvas.TopProperty, _bananaCurrentPosition.X);
-            _bananaControl.SetValue(Canvas.LeftProperty, _bananaCurrentPosition.Y);
+            _bananaControl.SetValue(Canvas.TopProperty, _bananaRect.Y);
+            _bananaControl.SetValue(Canvas.LeftProperty, _bananaRect.X);
         }
 
         private bool TimerAction()
@@ -242,11 +237,13 @@ namespace GorillazVintage
 
                 SetBananaNewPosition(true);
 
-                var colision = ColideWithBuilding();
+                ColideWithMonkey();
+
+                var buildingColision = ColideWithBuilding();
 
                 Dispatcher.Invoke(() => DrawBanana(false));
 
-                if (colision)
+                if (buildingColision)
                 {
                     Dispatcher.Invoke(() => CvsMain.Children.Remove(_bananaControl));
                     _throwInProgress = false;
@@ -279,34 +276,32 @@ namespace GorillazVintage
             return _throwInProgress;
         }
 
+        private void ColideWithMonkey()
+        {
+
+        }
+
         private void SetBananaNewPosition(bool fromRight)
         {
             var yDelta = (_flightTime * _initialSpeed * Math.Cos(_initialAngle)) * (fromRight  ? - 1 : 1);
             var xDelta = ((_flightTime * _initialSpeed * Math.Sin(_initialAngle)) - (0.5 * GRAVITY * _flightTime * _flightTime));
 
-            _bananaCurrentPosition = new Point(
-                _bananaInitialPosition.X - (METER_TO_PIXEL_RATE * xDelta),
-                _bananaInitialPosition.Y + (METER_TO_PIXEL_RATE * yDelta)
-            );
+            _bananaRect.Y = _bananaInitialPosition.X - (METER_TO_PIXEL_RATE * xDelta);
+            _bananaRect.X = _bananaInitialPosition.Y + (METER_TO_PIXEL_RATE * yDelta);
         }
 
         private bool ColideWithBuilding()
         {
-            var bananaRect = new Rect(
-                _bananaCurrentPosition.Y,
-                _bananaCurrentPosition.X,
-                BANANA_SIZE,
-                BANANA_SIZE);
             int i = 0;
             foreach (var building in _buildingsInfo)
             {
-                building.Intersect(bananaRect);
+                building.Intersect(_bananaRect);
                 if (building != Rect.Empty)
                 {
                     foreach (var explosion in _explosions.Keys)
                     {
-                        explosion.Intersect(bananaRect);
-                        if (bananaRect == explosion)
+                        explosion.Intersect(_bananaRect);
+                        if (_bananaRect == explosion)
                         {
                             return false;
                         }
@@ -347,8 +342,21 @@ namespace GorillazVintage
                 CvsMain.Children.Add(building);
             }
 
-            CvsMain.Children.Add(DrawMonkeySprite(1));
-            CvsMain.Children.Add(DrawMonkeySprite(8));
+            _monkey1 = new Rect(
+                (BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2),
+                HEIGHT - _buildingsInfo[1].Height - MONKEY_SIZE,
+                MONKEY_SIZE,
+                MONKEY_SIZE
+            );
+            _monkey2 = new Rect(
+                (8 * BUILDING_WIDTH) + ((BUILDING_WIDTH - MONKEY_SIZE) / 2),
+                HEIGHT - _buildingsInfo[8].Height - MONKEY_SIZE,
+                MONKEY_SIZE,
+                MONKEY_SIZE
+            );
+
+            CvsMain.Children.Add(DrawMonkeySprite(_monkey1));
+            CvsMain.Children.Add(DrawMonkeySprite(_monkey2));
         }
     }
 }
